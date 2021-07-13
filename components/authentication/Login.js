@@ -1,243 +1,309 @@
-import React, { Component, useState } from "react";
+import React, { Component, useEffect, useRef, useState } from "react";
 import {
   StyleSheet,
   View,
   StatusBar,
-  ImageBackground,
-  Text,
-  TextInput,
-  TouchableOpacity
+  Text, Image,
+  TouchableOpacity,
+  ScrollView,
+  Alert
 } from "react-native";
-import EvilIconsIcon from "react-native-vector-icons/EvilIcons";
+import CountryPicker, { CountryModalProvider } from 'react-native-country-picker-modal';
+import { TextInput } from 'react-native-paper';
+import { SafeAreaView } from "react-native-safe-area-context";
 import { connect } from "react-redux";
 import { LogingUser } from "../../redux/actions/userAction"
-
-
-
+import { setError, setActivityLoader } from "../../redux/actions/uiAction"
+import { useFocusEffect } from "@react-navigation/core";
+import Loader from "../Loader";
+import { CountUp } from "use-count-up";
+import Header from "../Header";
+import { t } from "i18n-js";
+import firebase from 'firebase/app'
+import "firebase/auth";
+import { firebaseConfig } from "../../firebase";
+import { FirebaseRecaptchaVerifierModal, FirebaseRecaptchaBanner } from 'expo-firebase-recaptcha';
 
 function Login(props) {
-  const [userCredential,setUserCredential] =useState({
-      email:"",
-      password:"",
-      errors:[]
-    }
+  const [validPhone, setValidPhone] = useState(true);
+  const [start, setStart] = useState(0);
+  const [prefix, setPrefix] = useState("Retry in ");
+  const [suffix, setSuffix] = useState(" seconds");
+  const [userCredential, setUserCredential] = useState({
+    phone: "",
+    countryCode: "SE",
+    country: undefined,
+    callingCode: "+46"
+  })
+  const [inputPosition, setInputPosition] = useState()
+  const scrollerRef = useRef()
+  const [verificationId, setVerificationId] = useState();
+  const [verificationCode, setVerificationCode] = useState();
+  const recaptchaVerifier = useRef(null);
+
+
+  useFocusEffect(
+    React.useCallback(() => {
+      setUserCredential({
+        ...userCredential, phone: "",
+
+      })
+      props.setError({ loginPhoneInput: "" })
+      if (props.ui.waitToRetry > 0) {
+
+        setStart(props.ui.waitToRetry);
+      }
+
+
+
+    }, [])
+
+  );
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (props.ui.waitToRetry > 0) {
+
+        setStart(props.ui.waitToRetry);
+      }
+
+
+
+    }, [props.ui.waitToRetry])
   )
-     
-  const handleSubmit=((event)=>{
-    const user={
-      email:userCredential.email,
-      password:userCredential.password,
-    };
-    props.LogingUser(user,props);
-    console.log(user);
-  
-  });
+
+
+  const phoneValidator = (value) => {
+    props.setError({ loginPhoneInput: undefined })
+    setValidPhone(true)
+    const pattern = (/^[0-9\b]+$/);
+    if (value == "") {
+      props.setError({ loginPhoneInput: t("enterPhone") })
+      setValidPhone(false)
+    }
+    if (!pattern.test(value)) {
+
+      setValidPhone(false)
+      props.setError({ loginPhoneInput: t("onlyNumber") })
+
+    }
+    if (value.length != 9) {
+
+      props.setError({ loginPhoneInput: t("validNumber") })
+      setValidPhone(false)
+    }
+
+  }
+
+  const handleSubmit = async (event) => {
+    props.setActivityLoader({
+      isLoading: true
+    })
+    const phone = userCredential.callingCode + userCredential.phone;
+      const phoneProvider = new firebase.auth.PhoneAuthProvider()
+      console.log(phoneProvider)
+
+      phoneProvider.verifyPhoneNumber(
+        phone,
+        recaptchaVerifier.current
+      ).then((verificationId)=>{
+        console.log(verificationId)
+        setVerificationId(verificationId);
+        props.LogingUser(verificationId,props)
+      }).catch((err) =>{
+        console.log("vertification error",err)
+        props.setActivityLoader({
+          isLoading: false
+        })
+        setTimeout(() => {
+          Alert.alert(
+            "Error have occured",
+            "Please try again leter",
+            [
+                { text: "OK", onPress: () => props.navigation.navigate("Login") }
+            ], 
+            { cancelable: false }
+        );
+        }, 0);
+      
+    })
     
+    /*props.LogingUser(user, props);*/
+  } ;
+
+
   return (
-    <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor="rgba(0,0,0,0)" />
-      <View style={styles.background}>
-        <ImageBackground
-          style={styles.rect}
-          imageStyle={styles.rect_imageStyle}
-          source={require("./Gradient_HtqQoUO.png")}
-        >
-          <View style={styles.ማይቴላርColumn}>
-            <Text style={styles.ማይቴላር}>ማይ ቴላር</Text>
-            <View style={styles.logo}>
-              <Text style={styles.logIn}>Log In</Text>
+    <SafeAreaView style={styles.root}>
+       <FirebaseRecaptchaVerifierModal
+        ref={recaptchaVerifier}
+        firebaseConfig={firebaseConfig}
+        attemptInvisibleVerification={true}
+      />
+      <StatusBar hidden={false}></StatusBar>
+      <Loader isLoading={props.ui.isLoading} />
+      <View style={styles.container}>
+        <View style={styles.group}>
+          <Header singUp="Log in or Sign up" style={styles.header}></Header>
+          <ScrollView ref={scrollerRef} style={{
+            width: 375,
+
+          }} contentContainerStyle={{
+
+            alignItems: "center",
+            alignSelf: "center", height: 700
+          }} >
+            <Image
+              source={require("../../assets/images/107-layers.png")}
+              resizeMode="contain"
+              style={styles.image}
+            ></Image>
+            <Text style={styles.letsSignYouIn}>{t('letsSign')}</Text>
+            <Text style={styles.loremIpsum}>
+              {t("welcomeBack")}
+            </Text>
+            {props.ui.loginPhoneInput != undefined &&
+              <Text style={styles.error}>{props.ui.loginPhoneInput}</Text>}
+            <View onLayout={(e) => setInputPosition(e.nativeEvent.layout.y)
+            } style={{
+              marginBottom: 7.5,
+              marginTop: 7.5, flexDirection: "row", width: "100%", paddingLeft: 15, paddingRight: 15
+            }}>
+              <CountryPicker {...{
+                withModal: "true", countryCode: userCredential.countryCode,
+                withFlagButton: "true", withCallingCodeButton: "true", withCloseButton: "true", withFilter: "true", withAlphaFilter: "true", withEmoji: "true", withFlag: "false", withAlphaFilter: "true", visible: "true",
+
+                containerButtonStyle: { paddingTop: 10, borderWidth: 1, borderColor: 'grey', borderRadius: 5, height: 52, paddingBottom: 10, paddingRight: 5, marginTop: 5, marginRight: 10 }
+              }}
+                onSelect={(country) => {
+                  setUserCredential({ ...userCredential, callingCode: "+" + country.callingCode[0], countryCode: country.cca2 });
+                  console.log("country", userCredential.callingCode)
+                }} />
+
+              <TextInput value={userCredential.phone} error={!validPhone} keyboardType="number-pad" onFocus={() => { scrollerRef.current.scrollTo({ x: 0, y: inputPosition + 500, animated: true }); }} onChangeText={(value) => {
+                setUserCredential({ ...userCredential, phone: value });
+                phoneValidator(value)
+              }}
+                style={styles.inputMoney} label={t("phone") }mode='outlined'>
+
+              </TextInput>
             </View>
-            <View style={styles.form}>
-              <View style={styles.usernameColumn}>
-                <View style={styles.username}>
-                  <EvilIconsIcon
-                    name="user"
-                    style={styles.icon22}
-                  ></EvilIconsIcon>
-                  <TextInput
-                    placeholder="Phone Number "
-                    placeholderTextColor="rgba(255,255,255,1)"
-                    secureTextEntry={false}
-                    style={styles.usernameInput}
-                    onChangeText={email => setUserCredential({  ...userCredential, email } )}
-                  ></TextInput>
-                </View>
-                <View style={styles.password}>
-                  <EvilIconsIcon
-                    name="lock"
-                    style={styles.icon2}
-                  ></EvilIconsIcon>
-                  <TextInput
-                    placeholder="Password"
-                    placeholderTextColor="rgba(255,255,255,1)"
-                    secureTextEntry={true}
-                    style={styles.passwordInput}
-                    onChangeText={password => setUserCredential({  ...userCredential, password } )}
-                  ></TextInput>
-                </View>
-              </View>
-              <View style={styles.usernameColumnFiller}></View>
-              <TouchableOpacity
-                onPress={() => handleSubmit()}
-                style={styles.button}
-              >
-                <Text style={styles.text2}>Log in</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-          <View style={styles.ማይቴላርColumnFiller}></View>
-          <View style={styles.footerTexts}>
-            <TouchableOpacity
-              onPress={() => props.navigation.navigate("Register")}
-              style={styles.button2}
-            >
-              <View style={styles.createAccountFiller}></View>
-              <Text style={styles.createAccount}>Create Account</Text>
+            <TouchableOpacity onPress={() => handleSubmit()} style={styles.button}>
+              <Text style={styles.sIngIn}>{t("log")}</Text>
             </TouchableOpacity>
-            <View style={styles.button2Filler}></View>
-            <Text style={styles.needHelp}>Need Help?</Text>
-          </View>
-        </ImageBackground>
+          </ScrollView>
+        </View>
       </View>
-    </View>
+    </SafeAreaView  >
+
   );
 }
 
 const styles = StyleSheet.create({
+  error: {
+    color: "#D8000C",
+    fontFamily: 'Roboto - Medium',
+    fontSize: 16,
+    fontWeight: '700',
+    fontStyle: 'normal',
+    textAlign: 'center',
+    alignSelf: "center",
+  },
   root: {
     flex: 1,
-    backgroundColor: "rgb(255,255,255)"
-  },
-  background: {
-    flex: 1
-  },
-  rect: {
-    flex: 1
-  },
-  rect_imageStyle: {},
-  ማይቴላር: {
-  
-    color: "rgba(245,243,243,1)",
-    fontSize: 25,
-    marginLeft: 98
-  },
-  logo: {
-    width: 244,
-    height: 135,
-    marginTop: 39,
-    marginLeft: 17
-  },
-  logIn: {
+    backgroundColor: "#ffffff"
 
-    color: "rgba(255,255,255,1)",
-    fontSize: 30,
-    width: 134,
-    height: 45,
-    marginTop: 23,
-    marginLeft: 70
-  },
-  form: {
-    height: 230,
-    marginTop: 29
-  },
-  username: {
-    height: 59,
-    backgroundColor: "rgba(251,247,247,0.25)",
-    borderRadius: 5,
-    flexDirection: "row"
-  },
-  icon22: {
-    color: "rgba(255,255,255,1)",
-    fontSize: 30,
-    marginLeft: 20,
-    alignSelf: "center"
-  },
-  usernameInput: {
-    height: 30,
-    color: "rgba(255,255,255,1)",
+  }, container: {
     flex: 1,
-    marginRight: 11,
-    marginLeft: 11,
-    marginTop: 15
+    backgroundColor: "rgba(235,235,235,1)"
   },
-  password: {
-    height: 59,
-    backgroundColor: "rgba(253,251,251,0.25)",
-    borderRadius: 5,
-    flexDirection: "row",
-    marginTop: 27
-  },
-  icon2: {
-    color: "rgba(255,255,255,1)",
-    fontSize: 33,
-    marginLeft: 20,
-    alignSelf: "center"
-  },
-  passwordInput: {
-    height: 30,
-    color: "rgba(255,255,255,1)",
+  group: {
     flex: 1,
-    marginRight: 17,
-    marginLeft: 8,
-    marginTop: 14
+    justifyContent: "space-between",
+    alignItems: "center",
+    alignSelf: "center",
+    width: "100%"
   },
-  usernameColumn: {},
-  usernameColumnFiller: {
-    flex: 1
+  header: {
+    height: 70,
+    alignSelf: "stretch"
+  },
+  image: {
+    width: 200,
+    height: 200
+  },
+  letsSignYouIn: {
+    color: '#000000',
+    fontFamily: 'SF Pro Text - Semibold',
+    fontSize: 17,
+    fontWeight: '600',
+    fontStyle: 'normal',
+    alignSelf: "center",
+    letterSpacing: -0.41,
+    lineHeight: 22
+  },
+  loremIpsum: {
+    color: '#000000',
+    fontFamily: 'SF Pro Text - Regular',
+    fontSize: 15,
+    fontWeight: '400',
+    fontStyle: 'normal',
+    alignSelf: "center",
+    letterSpacing: -0.41,
+    lineHeight: 22,
+    color: "#121212",
+    marginBottom: 7.5,
+    marginTop: 7.5,
+    marginLeft:10,
+    marginRight:10,
+  },
+  inputMoney: {
+    flex: 1, alignSelf: "center", fontSize: 17, marginBottom: 10, height: 50,color: '#000000',
+    fontFamily: 'SF Pro Text - Regular',
+    fontWeight: '400',
+    fontStyle: 'normal',
+    alignSelf: "center",
+    letterSpacing: -0.41,
+    lineHeight: 22,
+
+
   },
   button: {
-    height: 59,
-    backgroundColor: "rgba(31,178,204,1)",
+    height: 50,
+    justifyContent: "center",
+    backgroundColor: "rgba(113,28,241,1)",
     borderRadius: 5,
-    justifyContent: "center"
+    width: 345,
+    marginBottom: 7.5,
+    marginTop: 7.5
   },
-  text2: {
-    color: "rgba(255,255,255,1)",
-    alignSelf: "center"
+  sIngIn: {
+    color: '#ffffff',
+    fontFamily: 'SF Pro Text - Semibold',
+    fontSize: 17,
+    fontWeight: '600',
+    fontStyle: 'normal',
+    alignSelf: "center",
+    letterSpacing: -0.41,
+    lineHeight: 22,
+    alignSelf: "center",
   },
-  ማይቴላርColumn: {
-    marginTop: 63,
-    marginLeft: 41,
-    marginRight: 41
-  },
-  ማይቴላርColumnFiller: {
-    flex: 1
-  },
-  footerTexts: {
-    height: 14,
-    flexDirection: "row",
-    marginBottom: 36,
-    marginLeft: 37,
-    marginRight: 36
-  },
-  button2: {
-    width: 104,
-    height: 14,
-    alignSelf: "flex-end"
-  },
-  createAccountFiller: {
-    flex: 1
-  },
-  createAccount: {
-    color: "rgba(255,255,255,0.5)"
-  },
-  button2Filler: {
-    flex: 1,
-    flexDirection: "row"
-  },
-  needHelp: {
-    color: "rgba(255,255,255,0.5)",
-    alignSelf: "flex-end",
-    marginRight: -1
+  loremIpsum2: {
+    fontFamily: 'Roboto - Regular',
+    color: "#121212",
+    fontSize: 16
   }
+
 });
 
-function mapStateToProp(state){
-  return {user :state.user}
+function mapStateToProp(state) {
+  return {
+    user: state.user,
+    ui: state.ui
+  }
 }
-function mspDispatchToProp (){
-  return { LogingUser}
+function mspDispatchToProp() {
+  return { LogingUser, setError, setActivityLoader }
 }
 
 
-export default connect(mapStateToProp,mspDispatchToProp ())(Login)
+export default connect(mapStateToProp, mspDispatchToProp())(Login)

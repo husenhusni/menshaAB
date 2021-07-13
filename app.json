@@ -23,7 +23,8 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
-      }
+      },
+      "package": "com.husnim1.MyshellingNative"
     },
     "web": {
       "favicon": "./assets/favicon.png"

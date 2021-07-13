@@ -1,364 +1,261 @@
-import React, { Component, useState } from "react";
+import React, { Component, useRef, useState } from "react";
 import {
   StyleSheet,
   View,
-  StatusBar,
-  ImageBackground,
-  TextInput,
-  Text,
-  TouchableOpacity
+  StatusBar, SafeAreaView, Image, Text, ScrollView, Modal, TouchableOpacity, Keyboard
+
 } from "react-native";
+import CountryPicker, { CountryModalProvider } from 'react-native-country-picker-modal';
 import EvilIconsIcon from "react-native-vector-icons/EvilIcons";
 import axios from "axios";
+import Header from "../Header";
+import Loader from "../Loader";
+import { connect } from "react-redux";
+import { UserSignup } from "../../redux/actions/userAction"
+import { setError, setActivityLoader } from "../../redux/actions/uiAction"
+import { Divider, TextInput } from 'react-native-paper';
+import { Card } from "native-base";
+import {t} from '../../languages/index'
 
-export default function SignUp({navigation}) {
-  const[user, setUser]=  useState({
+
+function SignUp(props) {
+  const [user, setUser] = useState({
     first_name: '',
-    last_name:'',
-    phone_number   : '',
-    password: ''
-    
-  }); 
-  const onClickListener = (viewId) => {
-      console.log(user);
-      axios.post('https://europe-west1-mysehelling-backend.cloudfunctions.net/api/signup', user).then(function(result){
-      navigation.navigate("Landing");
+    last_name: '',
+    phone_number: '',
+    language: ''
 
-      }).catch(function(error){
-        console.log(error);
-      });
+  });
+  const [position, setPosition] = useState("0")
+  const [validFirstName, setValidFirstName] = useState(true)
+  const [validLastName, setValidLastName] = useState(true)
+  const [modalVisible, setModalVisible] = useState(false)
+  const scrollerRef = useRef()
+
+  const nameValidator = (nameInput, indicatator) => {
+    const pattern = /^([a-zA-Z]{2,40})+$/;
+
+    if (!pattern.test(nameInput)) {
+
+      props.setError({ first_name: t("correctName") })
+      if (indicatator == "first_name")
+        setValidFirstName(false)
+      else
+        setValidLastName(false)
 
     }
+
+    else if(pattern.test(nameInput))  {
+      if (indicatator == "first_name")
+        setValidFirstName(true)
+      else
+        setValidLastName(true)
+    }
+    
+    if(validFirstName==true && validLastName==true){
+      props.setError({ first_name: undefined })
+    }
+
+  }
+
+  const phoneValidator = (value) => {
+    props.setError({ registerPhone: undefined })
+    setValidPhone(true)
+    const pattern = (/^[0-9\b]+$/);
+    if (value == "") {
+      props.setError({ registerPhone: t("enterPhone")})
+      setValidPhone(false)
+    }
+    if (!pattern.test(value)) {
+
+      setValidPhone(false)
+      props.setError({ registerPhone: t("onlyNumber" )})
+
+    }
+    if (value.length != 9) {
+
+      props.setError({ registerPhone: t("validNumber") })
+      setValidPhone(false)
+    }
+
+  }
+
+  const onHandleSignUp = () => {
+    props.setActivityLoader({
+      isLoading:true
+    })
+    props.UserSignup(user, props);
+  }
   return (
-    <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor="rgba(0,0,0,0)" />
-      <View style={styles.backgroundStack}>
-        <View style={styles.background}>
-          <ImageBackground
-            style={styles.rect2}
-            imageStyle={styles.rect2_imageStyle}
-            source={require("../../assets/images/Gradient_HtqQoUO.png")}
-          >
-            <View style={styles.name1StackColumn}>
-              <Text style={styles.text3}>CREATE ACCOUNT</Text>
-              <View style={styles.form}>
-                <View style={styles.nameColumn}>
-                  <View style={styles.name}>
-                    <EvilIconsIcon
-                      name="user"
-                      style={styles.icon5}
-                    ></EvilIconsIcon>
-                    <TextInput
-                      placeholder="First Name"
-                      placeholderTextColor="rgba(255,255,255,1)"
-                      secureTextEntry={false}
-                      style={styles.nameInput}
-                      onChangeText={first_name => setUser({  ...user, first_name } )}
-                    ></TextInput>
-                  </View>
-                  <View style={styles.name}>
-                   <EvilIconsIcon
-                      name="user"
-                      style={styles.icon5}
-                    ></EvilIconsIcon>
-                    <TextInput
-                      placeholder="Last Name"
-                      placeholderTextColor="rgba(255,255,255,1)"
-                      secureTextEntry={false}
-                      style={styles.nameInput2}
-                      onChangeText={last_name => setUser({  ...user, last_name })}
-                    ></TextInput>
-                  </View>
-                  <View style={styles.email}>
-                    <EvilIconsIcon
-                      name="envelope"
-                      style={styles.icon6}
-                    ></EvilIconsIcon>
-                    <TextInput
-                      placeholder="Phone"
-                      placeholderTextColor="rgba(255,255,255,1)"
-                      secureTextEntry={false}
-                      style={styles.emailInput}
-                      onChangeText={phone_number => setUser({ ...user, phone_number  })}
-                    ></TextInput>
-                  </View>
-                </View>
-                <View style={styles.nameColumnFiller}></View>
-                <View style={styles.password}>
-                  <EvilIconsIcon
-                    name="lock"
-                    style={styles.icon7}
-                  ></EvilIconsIcon>
-                  <TextInput
-                    placeholder="Password"
-                    placeholderTextColor="rgba(255,255,255,1)"
-                    secureTextEntry={true}
-                    style={styles.passwordInput}
-                    onChangeText={password => setUser({  ...user, password })}
-                  ></TextInput>
-                </View>
+    <SafeAreaView style={styles.root}>
+      <StatusBar hidden={false}></StatusBar>
+      <Loader isLoading={props.ui.isLoading} />
+      <View style={styles.container}>
+        <View style={styles.group}>
+          <Header singUp={t("signUp")} style={styles.header}></Header>
+          <View style={{ flex: 1 }}>
+            <ScrollView ref={scrollerRef} style={{
+              flex: 1
+            }} contentContainerStyle={{
+              alignItems: "center", marginLeft: 15, marginRight: 15,
+
+              height: 1000
+            }} ><Image
+              source={require("../../assets/images/107-layers.png")}
+              resizeMode="contain"
+              style={styles.image}
+            ></Image>
+              <Text style={styles.letsSignYouIn}>{t("letsSignUp")}</Text>
+                <Text style={styles.error}>{props.ui.first_name}</Text>
+                <Text style={styles.error}>{props.ui.registerPhone}</Text>
+              <TextInput value={user.first_name} error={!validFirstName} onFocus={()=>{scrollerRef.current.scrollTo({ x: 0, y:240, animated: true });}}
+           onChangeText={(value) => {
+                setUser({ ...user, first_name: value });
+                nameValidator(value,"first_name");
+
+              }}
+                style={styles.inputMoney} label={t("firstName")} mode='outlined'>
+
+              </TextInput>
+              <TextInput value={user.last_name} error={!validLastName} onFocus={()=>{scrollerRef.current.scrollTo({ x: 0, y:300, animated: true });}} onChangeText={(value) => {
+                setUser({ ...user, last_name: value });
+                nameValidator(value)
+              }}
+                style={styles.inputMoney} label={t("lastName")} mode='outlined'>
+              </TextInput>
+              
+              <View onLayout={(e) => setPosition(e.nativeEvent.layout.y)} style={{ width: "100%", height: 50, marginBottom: 15 }}>
+                <TextInput value={user.language} onBlur={()=>{scrollerRef.current.scrollTo({ x: 0, y:40, animated: true });}} onChangeText={() => setModalVisible(true)}
+                  style={{ ...styles.inputMoney, flex: 1 }} label={t("selectLan")} mode='outlined'>
+                </TextInput>
               </View>
-            </View>
-            <View style={styles.name1StackColumnFiller}></View>
-            <View style={styles.buttonColumn}>
-              <TouchableOpacity
-                onPress={() => props.navigation.navigate("Timeline")}
-                style={styles.button}
-              >
-                <Text style={styles.text5}
-                onPress={() =>onClickListener('sign_up')}
-                >Sign Up</Text>
+              <Modal
+                animationType="slide"
+                transparent={true}
+                visible={modalVisible}>
+                <View style={{ flex: 1, justifyContent: "center", backgroundColor: "background-color: rgba(0,0,0,.2)", marginBottom: 7.5 }}>
+                  <View style={{ width: "100%", alignSelf: "center", height: 100 }}>
+                    <Card style={{ marginLeft: 15, marginRight: 15 }}>
+                      <Text style={{ ...styles.loremIpsum2, fontSize: 18 }}>{t("yourLan")}</Text>
+                      <Divider></Divider>
+                      <TouchableOpacity onPress={() => {
+                        Keyboard.dismiss()
+                        setUser({ ...user, language: "en" });
+                        setModalVisible(false)
+                        
+                      }}>
+                        <Text style={styles.loremIpsum2}>English</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => {
+                        setUser({ ...user, language: "sv" });
+                        setModalVisible(false)
+                        
+                      }}>
+                        <Text style={styles.loremIpsum2}>Svenska</Text>
+                      </TouchableOpacity>
+                    </Card>
+                  </View>
+
+                </View>
+              </Modal>
+              <TouchableOpacity onPress={() => onHandleSignUp()} style={styles.button}>
+                <Text style={styles.sIngIn}>{t("signUp")}</Text>
               </TouchableOpacity>
-              <Text style={styles.text4}>Terms &amp; Conditions</Text>
+              <View style={{flexDirection:"row"}}>
             </View>
-          </ImageBackground>
-        </View>
-        <View style={styles.name2}>
-          <EvilIconsIcon name="user" style={styles.icon9}></EvilIconsIcon>
-          <TextInput
-            placeholder="Name"
-            placeholderTextColor="rgba(255,255,255,1)"
-            secureTextEntry={false}
-            style={styles.nameInput2}
-          ></TextInput>
+            </ScrollView>
+          </View>
         </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "rgb(255,255,255)"
+    backgroundColor: "#ffffff"
+
   },
-  background: {
-    top: 39,
-    left: 0,
-    position: "absolute",
-    right: 0,
-    bottom: 0
+  inputMoney: {
+    width: "100%", alignSelf: "center", fontSize: 16, marginBottom: 10, height: 50
   },
-  rect2: {
-    flex: 1
+  letsSignYouIn: {
+    fontFamily: 'Roboto - Bold',
+    color: "#121212",
+    fontSize: 22,
+    marginBottom: 7.5,
+    marginTop: 7.5
   },
-  rect2_imageStyle: {},
-  name1: {
-    top: 0,
-    left: 0,
-    height: 59,
-    backgroundColor: "rgba(255,255,255,0.25)",
-    position: "absolute",
-    right: 0,
-    borderRadius: 5,
-    flexDirection: "row"
+  image: {
+    width: 200,
+    height: 200,
+    marginTop: 7.5,
+    marginBottom: 7.5
   },
-  icon8: {
-    color: "rgba(255,255,255,1)",
-    fontSize: 33,
-    width: 33,
-    height: 33,
-    marginLeft: 20,
-    marginTop: 13
+  header: {
+    height: 70,
+    alignSelf: "stretch"
   },
-  nameInput1: {
-    height: 30,
-    color: "rgba(255,255,255,1)",
-    fontSize: 14,
-    flex: 1,
-    marginRight: 17,
-    marginLeft: 8,
-    marginTop: 14
-  },
-  icon10: {
-    left: 20,
-    position: "absolute",
-    color: "rgba(255,255,255,1)",
-    fontSize: 33,
-    width: 33,
-    height: 33,
-    top: 13
-  },
-  name1Stack: {
-    height: 59
-  },
-  text3: {
-    color: "rgba(255,255,255,1)",
-    fontSize: 24,
-    marginTop: 101,
-    alignSelf: "center"
-  },
-  form: {
-    height: 230,
-    marginTop: 108,
-    marginLeft: 46,
-    marginRight: 31
-  },
-  name: {
-    height: 59,
-    marginTop: 27,
-    backgroundColor: "rgba(255,255,255,0.25)",
-    borderRadius: 5,
-    width: 287,
-    flexDirection: "row"
-  },
-  icon5: {
-    color: "rgba(255,255,255,1)",
-    fontSize: 33,
-    width: 33,
-    height: 33,
-    marginLeft: 16,
-    marginTop: 13
-  },
-  nameInput: {
-    height: 30,
-    color: "rgba(255,255,255,1)",
-    fontSize: 14,
-    flex: 1,
-    marginRight: 16,
-    marginLeft: 13,
-    marginTop: 14
+  loremIpsum2: {
+    marginLeft: 10,
+    marginTop: 7.5,
+    marginBottom: 7.5,
+    fontFamily: 'Roboto - Regular',
+    color: "#121212",
+    fontSize: 16
   },
   group: {
-    top: 0,
-    height: 59,
-    backgroundColor: "rgba(255,255,255,0.25)",
-    position: "absolute",
-    borderRadius: 5,
-    width: 287
-  },
-  icon11: {
-    color: "rgba(255,255,255,1)",
-    fontSize: 33,
-    width: 33,
-    height: 33,
-    marginTop: 13,
-    marginLeft: 16
-  },
-  nameInput3: {
-    top: 13,
-    left: 55,
-    height: 32,
-    color: "rgba(255,255,255,1)",
-    position: "absolute",
-    right: 12,
-    fontSize: 14
-  },
-  groupStack: {
-    height: 59,
-    marginTop: 18,
-    marginLeft: 2
-  },
-  email: {
-    height: 59,
-    backgroundColor: "rgba(255,255,255,0.25)",
-    borderRadius: 5,
-    width: 287,
-    flexDirection: "row",
-    marginTop: 27
-  },
-  icon6: {
-    color: "rgba(255,255,255,1)",
-    fontSize: 33,
-    marginLeft: 15,
-    alignSelf: "center"
-  },
-  emailInput: {
-    height: 30,
-    color: "rgba(255,255,255,1)",
+
     flex: 1,
-    marginRight: 17,
-    marginLeft: 13,
-    marginTop: 14
+
+
+    width: "100%"
   },
-  nameColumn: {
-    marginTop: -77,
-    marginLeft: -4,
-    marginRight: -2
-  },
-  nameColumnFiller: {
-    flex: 1
-  },
-  password: {
-    height: 59,
-    backgroundColor: "rgba(255,255,255,0.25)",
-    borderRadius: 5,
-    flexDirection: "row",
-    marginBottom: 8,
-    marginTop: 27,
-    marginLeft: -4,
-    marginRight: 35
-  },
-  icon7: {
-    color: "rgba(255,255,255,1)",
-    fontSize: 33,
-    marginLeft: 15,
-    marginTop: 13
-  },
-  passwordInput: {
-    height: 30,
-    color: "rgba(255,255,255,1)",
+  container: {
     flex: 1,
-    marginRight: 17,
-    marginLeft: 13,
-    alignSelf: "center"
-  },
-  name1StackColumn: {},
-  name1StackColumnFiller: {
-    flex: 1
+    backgroundColor: "rgba(235,235,235,1)"
   },
   button: {
-    height: 55,
-    backgroundColor: "rgba(247,247,247,0)",
+    height: 50,
+    justifyContent: "center",
+    backgroundColor: "rgba(113,28,241,1)",
     borderRadius: 5,
-    borderColor: "rgba(255,255,255,1)",
-    borderWidth: 1,
-    marginBottom: 55
+    fontFamily: 'Roboto - Regular',
+    fontStyle: "normal",
+    fontWeight: "400",
+    color: "#121212",
+    fontSize: 16,
+    width: "100%",
+    marginBottom: 7.5,
+    marginTop: 7.5
   },
-  text5: {
-    width: 66,
-    color: "rgba(255,255,255,1)",
-    marginTop: 17,
-    marginLeft: 105
+  sIngIn: {
+    fontFamily: 'Roboto - Bold',
+    color: "rgba(247,246,246,1)",
+    alignSelf: "center",
+    fontSize: 16
   },
-  text4: {
-    color: "rgba(255,255,255,0.5)",
-    alignSelf: "center"
+  error: {
+    color: "#D8000C",
+    fontFamily: 'Roboto - Medium',
+    fontSize: 16,
+    fontWeight: '700',
+    fontStyle: 'normal',
+    textAlign: 'center',
+    alignSelf: "center",
   },
-  buttonColumn: {
-    marginBottom: 31,
-    marginLeft: 41,
-    marginRight: 41
-  },
-  name2: {
-    top: 0,
-    left: 0,
-    height: 59,
-    backgroundColor: "rgba(255,255,255,0.25)",
-    position: "absolute",
-    right: 0,
-    borderRadius: 5,
-    flexDirection: "row"
-  },
-  icon9: {
-    color: "rgba(255,255,255,1)",
-    fontSize: 33,
-    width: 33,
-    height: 33,
-    marginLeft: 20,
-    marginTop: 13
-  },
-  nameInput2: {
-    height: 30,
-    color: "rgba(255,255,255,1)",
-    fontSize: 14,
-    flex: 1,
-    marginRight: 17,
-    marginLeft: 8,
-    marginTop: 14
-  },
-  backgroundStack: {
-    flex: 1,
-    marginTop: -39
-  }
 });
+
+function mapStateToProp(state) {
+  return {
+    user: state.user,
+    ui: state.ui
+  }
+}
+function mspDispatchToProp() {
+  return { UserSignup, setError, setActivityLoader }
+}
+
+
+export default connect(mapStateToProp, mspDispatchToProp())(SignUp)

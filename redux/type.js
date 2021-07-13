@@ -5,7 +5,9 @@ export const LOADING_USER='LOADING_USER';
 
 //transaction Form
 export const SET_TRANSACTION='SET_TRANSACTION';
-export const UPLOAD_TRANSACTION='UPLOAD_TRANSACTION';
+export const COMPLETE_TRANSACTION='COMPLETE_TRANSACTION';
+export const SET_Qoute='SET_Qoute';
+export const ONGOING_TRANSACTION='ONGOING_TRANSACTION';
 
 
 export const SET_ERRORS='SET_ERRORS';
